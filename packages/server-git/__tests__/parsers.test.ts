@@ -443,6 +443,17 @@ describe("parseDiffStat — name-status format (nameStatus: true)", () => {
   });
 });
 
+describe("parseDiffStat — CRLF line endings (Windows git output)", () => {
+  it("strips trailing \\r from filenames in CRLF numstat output", () => {
+    // git diff --numstat on Windows may produce \r\n line endings
+    const stdout = "10\t2\tsrc/index.ts\r\n5\t0\tsrc/new.ts\r\n";
+    const result = parseDiffStat(stdout);
+
+    expect(result.files[0].file).toBe("src/index.ts");
+    expect(result.files[1].file).toBe("src/new.ts");
+  });
+});
+
 describe("parseTagOutput", () => {
   it("parses tag list with dates and messages", () => {
     const stdout = [
