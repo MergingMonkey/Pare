@@ -165,7 +165,7 @@ export function registerDiffTool(server: McpServer) {
 
         const filePatches = atomicResult.stdout.split(/^diff --git /m).filter(Boolean);
         for (const patch of filePatches) {
-          const fileMatch = patch.match(/b\/(.+)\n/);
+          const fileMatch = patch.match(/b\/(.+?)\r?\n/);
           if (!fileMatch) continue;
           const matchedFile = diff.files.find((f) => f.file === fileMatch[1]);
           if (!matchedFile) continue;
@@ -235,7 +235,7 @@ export function registerDiffTool(server: McpServer) {
           // Split patch into per-file chunks
           const filePatches = patchResult.stdout.split(/^diff --git /m).filter(Boolean);
           for (const patch of filePatches) {
-            const fileMatch = patch.match(/b\/(.+)\n/);
+            const fileMatch = patch.match(/b\/(.+?)\r?\n/);
             if (fileMatch) {
               const matchedFile = diff.files.find((f) => f.file === fileMatch[1]);
               if (matchedFile) {
