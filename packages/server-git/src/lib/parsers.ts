@@ -279,8 +279,11 @@ const NAME_STATUS_LETTERS = new Set(["A", "M", "D", "R", "C", "T", "U", "X"]);
 export function parseDiffStat(stdout: string): GitDiff {
   // Parse --numstat output: additions\tdeletions\tfilename
   // Also handles --name-status output: STATUS\tfilename (when --name-status overrides --numstat)
-  // Normalize CRLF → LF so trailing \r characters don't leak into filenames on Windows.
-  const lines = stdout.replace(/\r\n/g, "\n").trim().split("\n").filter(Boolean);
+  // Split on all common line endings so trailing \r doesn't leak into filenames on Windows.
+  const lines = stdout
+    .trim()
+    .split(/\r\n|\r|\n/)
+    .filter(Boolean);
   const files = lines.map((line) => {
     const parts = line.split("\t");
 
