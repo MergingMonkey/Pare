@@ -443,6 +443,90 @@ describe("parseDiffStat — name-status format (nameStatus: true)", () => {
   });
 });
 
+describe("parseDiffStat — CRLF line endings (Windows git output)", () => {
+  it("strips trailing \\r from filenames in CRLF numstat output", () => {
+    // git diff --numstat on Windows may produce \r\n line endings
+    const stdout = "10\t2\tsrc/index.ts\r\n5\t0\tsrc/new.ts\r\n";
+    const result = parseDiffStat(stdout);
+
+    expect(result.files[0].file).toBe("src/index.ts");
+    expect(result.files[1].file).toBe("src/new.ts");
+  });
+});
+
+// ── Diff-tool filename extraction regex — CRLF regression ──────────────
+// These tests exercise the regex `b\/(.+?)\r?\n` used in diff.ts (both
+// atomicFull and standard full paths) to extract filenames from patch output.
+
+describe("diff-tool filename extraction regex — CRLF handling", () => {
+  // This is the exact regex from diff.ts lines 168 and 238
+  const extractFilename = (patch: string) => patch.match(/b\/(.+?)\r?\n/);
+
+  it("extracts filename from LF-terminated patch header", () => {
+    const patch = "a/src/index.ts b/src/index.ts\n--- a/src/index.ts\n+++ b/src/index.ts\n";
+    const match = extractFilename(patch);
+
+    expect(match).not.toBeNull();
+    expect(match![1]).toBe("src/index.ts");
+  });
+
+  it("extracts filename from CRLF-terminated patch header", () => {
+    const patch = "a/src/index.ts b/src/index.ts\r\n--- a/src/index.ts\r\n+++ b/src/index.ts\r\n";
+    const match = extractFilename(patch);
+
+    expect(match).not.toBeNull();
+    expect(match![1]).toBe("src/index.ts");
+  });
+
+  it("does not capture trailing \\r in filename with CRLF", () => {
+    const patch = "a/path/to/file.ts b/path/to/file.ts\r\n";
+    const match = extractFilename(patch);
+
+    expect(match).not.toBeNull();
+    expect(match![1]).toBe("path/to/file.ts");
+    expect(match![1]).not.toContain("\r");
+  });
+
+  it("handles multi-file CRLF patch by matching first file correctly", () => {
+    const patchChunks = [
+      "a/src/app.ts b/src/app.ts\r\n--- a/src/app.ts\r\n",
+      "a/src/utils.ts b/src/utils.ts\r\n--- a/src/utils.ts\r\n",
+    ];
+
+    for (const patch of patchChunks) {
+      const match = extractFilename(patch);
+      expect(match).not.toBeNull();
+      expect(match![1]).not.toContain("\r");
+    }
+  });
+
+  it("splits CRLF patch into per-file chunks with correct filenames", () => {
+    // Simulate the full split + extract flow from diff.ts
+    const fullPatch = [
+      "diff --git a/src/app.ts b/src/app.ts\r\n",
+      "--- a/src/app.ts\r\n",
+      "+++ b/src/app.ts\r\n",
+      "@@ -1,3 +1,4 @@\r\n",
+      " line1\r\n",
+      "+added\r\n",
+      "diff --git a/src/utils.ts b/src/utils.ts\r\n",
+      "--- a/src/utils.ts\r\n",
+      "+++ b/src/utils.ts\r\n",
+      "@@ -1,2 +1,2 @@\r\n",
+      "-old\r\n",
+      "+new\r\n",
+    ].join("");
+
+    const filePatches = fullPatch.split(/^diff --git /m).filter(Boolean);
+    const filenames = filePatches
+      .map((p) => p.match(/b\/(.+?)\r?\n/))
+      .filter(Boolean)
+      .map((m) => m![1]);
+
+    expect(filenames).toEqual(["src/app.ts", "src/utils.ts"]);
+  });
+});
+
 describe("parseTagOutput", () => {
   it("parses tag list with dates and messages", () => {
     const stdout = [
