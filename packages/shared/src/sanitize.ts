@@ -24,8 +24,13 @@ export function sanitizeErrorOutput(text: string): string {
   result = result.replace(/\/root\//g, "~/");
 
   // Quoted paths allow filename punctuation and spaces, but cannot cross
-  // the opening quote's matching boundary. Preserve separator escape depth.
-  result = result.replace(/(["'])[A-Z]:(\\+)Users\2(?:(?!\1)[^\\/:*?"<>|\r\n])+\2/gi, "$1~$2");
+  // the opening quote's matching boundary. Embedded profile apostrophes are
+  // allowed before name characters or the separator; normal Windows profile
+  // components cannot end in a space or period. Preserve separator escape depth.
+  result = result.replace(
+    /(["'])[A-Z]:(\\+)Users\2(?:(?!\1(?![\p{L}\p{M}\p{N}_'\\]))[^\\/:*?"<>|\r\n])+(?<![ .])\2/giu,
+    "$1~$2",
+  );
 
   // Unquoted profiles are either one non-whitespace token or name-like words.
   // Spaced punctuation requires quotes so diagnostic prose is not a username.

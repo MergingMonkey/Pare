@@ -110,6 +110,37 @@ describe("sanitizeErrorOutput", () => {
     },
   );
 
+  it.each(["O'Connor", "D'Ángelo", "O''Connor", "James'"])(
+    "redacts apostrophes in single-quoted filesystem errors: %s",
+    (profile) => {
+      const path = "C:\\Users\\" + profile + "\\project\\file.txt";
+      let original = "ENOENT: no such file or directory, open '" + path + "'";
+      let expected = "ENOENT: no such file or directory, open '~\\project\\file.txt'";
+      for (let level = 0; level < 3; level++) {
+        expect(sanitizeErrorOutput(original)).toBe(expected);
+        original = JSON.stringify({ message: original });
+        expected = JSON.stringify({ message: expected });
+      }
+      expect(sanitizeErrorOutput("'" + path + "','\\config.json'")).toBe(
+        "'~\\project\\file.txt','\\config.json'",
+      );
+      const bare = "'C:\\Users\\" + profile + "','\\config.json'";
+      expect(sanitizeErrorOutput(bare)).toBe(bare);
+    },
+  );
+
+  it.each([
+    "'C:\\Users\\alice failed, see ..\\logs'",
+    "The path 'C:\\Users\\alice was not found, tried ..\\x' is missing",
+    "'C:\\Users\\alice failed, see \\logs'",
+  ])("preserves quoted prose with an invalid profile ending: %s", (original) => {
+    expect(sanitizeErrorOutput(original)).toBe(original);
+  });
+
+  it("retains punctuation inside an ordinary quoted profile component", () => {
+    expect(sanitizeErrorOutput("'C:\\Users\\Dr. John Smith\\project'")).toBe("'~\\project'");
+  });
+
   it("leaves normal error text unchanged", () => {
     expect(sanitizeErrorOutput("Error: command failed")).toBe("Error: command failed");
   });
