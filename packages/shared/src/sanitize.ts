@@ -5,7 +5,7 @@
  *   /home/<user>/...  → ~/...
  *   /Users/<user>/... → ~/...
  *   /root/...         → ~/...
- *   C:\Users\<user>\... → ~\...
+ *   C:\Users\<user>\... → ~\... (also spaced names and encoded backslashes)
  *
  * Broad mode (PARE_SANITIZE_ALL_PATHS=true):
  *   Also redacts other absolute paths outside home directories:
@@ -23,8 +23,28 @@ export function sanitizeErrorOutput(text: string): string {
   // Unix: /root/rest → ~/rest
   result = result.replace(/\/root\//g, "~/");
 
-  // Windows: C:\Users\<username>\rest → ~\rest (with escaped or literal backslashes)
-  result = result.replace(/[A-Z]:\\Users\\[^\\:\s]+\\/gi, "~\\");
+  // Quoted profiles allow filename punctuation, including apostrophes.
+  // Recognize quoted-field boundaries instead of limiting the next name character.
+  result = result.replace(
+    /(["'])[A-Z]:(\\+)Users\2([^\\/:*?"<>|\r\n]+)\2/gi,
+    (match, quote: string, separator: string, profile: string) => {
+      // Normal Windows components cannot end in a space or period.
+      if (/[ .]$/.test(profile)) return match;
+      // A quote followed by whitespace, or punctuation leading to another
+      // quote, closes a field/expression rather than belonging to the profile.
+      if (quote === "'" && /'(?:\s|[,;]\s|[^\p{L}\p{M}\p{N}\\/:*?"<>|'\r\n]+')/u.test(profile)) {
+        return match;
+      }
+      return quote + "~" + separator;
+    },
+  );
+
+  // Unquoted profiles are either one non-whitespace token or name-like words.
+  // Spaced punctuation requires quotes so diagnostic prose is not a username.
+  result = result.replace(
+    /(?<!["'])[A-Z]:(\\+)Users\1(?:[^\s\\/:*?"<>|]+|[\p{L}\p{M}\p{N}_-]+(?:[ .]+[\p{L}\p{M}\p{N}_-]+)+)\1/giu,
+    "~$1",
+  );
 
   // Broad mode: redact remaining absolute paths
   if (process.env.PARE_SANITIZE_ALL_PATHS === "true") {

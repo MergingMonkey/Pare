@@ -28,9 +28,180 @@ describe("sanitizeErrorOutput", () => {
     expect(sanitizeErrorOutput("./src/index.ts")).toBe("./src/index.ts");
   });
 
+  it.each([1, 2])("redacts Windows home paths through %i JSON encoding levels", (levels) => {
+    let original = "C:\\Users\\review-user\\project\\error.log";
+    let expected = "~\\project\\error.log";
+    for (let level = 0; level < levels; level++) {
+      original = JSON.stringify({ message: original });
+      expected = JSON.stringify({ message: expected });
+    }
+    expect(sanitizeErrorOutput(original)).toBe(expected);
+  });
+
+  it.each([0, 1, 2])(
+    "does not consume adjacent JSON entries after %i extra encoding levels",
+    (levels) => {
+      let original = JSON.stringify(["C:\\Users\\John Smith", "\\config.json"]);
+      for (let level = 0; level < levels; level++) original = JSON.stringify(original);
+      expect(sanitizeErrorOutput(original)).toBe(original);
+    },
+  );
+
+  it.each(["&&", ";"])("does not consume shell text separated by %s", (separator) => {
+    const original = "cd C:\\Users\\alice " + separator + " cd ..\\foo";
+    expect(sanitizeErrorOutput(original)).toBe(original);
+  });
+
+  it.each(["\n", "\r\n"])("does not match Windows home paths across %j", (newline) => {
+    for (const home of ["C:\\Users\\", "C:\\Users\\alice"]) {
+      const original = home + newline + "other\\file";
+      expect(sanitizeErrorOutput(original)).toBe(original);
+    }
+    expect(
+      sanitizeErrorOutput("C:\\Users\\John Smith\\one" + newline + "C:\\Users\\alice\\two"),
+    ).toBe("~\\one" + newline + "~\\two");
+  });
+
+  it.each([
+    "cd C:\\Users\\alice & cd ..\\foo",
+    "cd C:\\Users\\alice&&cd ..\\foo",
+    "cd C:\\Users\\alice;cd ..\\foo",
+    "Cannot open C:\\Users\\alice, see ..\\logs",
+    "Cannot open C:\\Users\\alice (cache ..\\logs)",
+  ])("preserves diagnostic text after a bare home directory: %s", (original) => {
+    expect(sanitizeErrorOutput(original)).toBe(original);
+  });
+
+  it.each(["John & Jane", "John && Jane", "John; Smith", "John, Smith", "John (Work)"])(
+    "redacts punctuation in quoted Windows profiles: %s",
+    (profile) => {
+      for (const quote of ['"', "'"]) {
+        const original = quote + "C:\\Users\\" + profile + "\\project\\error.log" + quote;
+        expect(sanitizeErrorOutput(original)).toBe(quote + "~\\project\\error.log" + quote);
+      }
+      let original = JSON.stringify({ message: "C:\\Users\\" + profile + "\\project\\error.log" });
+      let expected = JSON.stringify({ message: "~\\project\\error.log" });
+      for (let level = 0; level < 2; level++) {
+        expect(sanitizeErrorOutput(original)).toBe(expected);
+        original = JSON.stringify(original);
+        expected = JSON.stringify(expected);
+      }
+    },
+  );
+
+  it.each([
+    "Jörg Müller",
+    "John  Smith",
+    "Alice.Smith",
+    "user@corp",
+    "Research&Development",
+    "O'Connor",
+  ])("retains ordinary unquoted Windows profile handling: %s", (profile) => {
+    expect(sanitizeErrorOutput("C:\\Users\\" + profile + "\\project")).toBe("~\\project");
+  });
+
+  it.each(["alice", "John Smith"])(
+    "does not cross single-quoted string boundaries: %s",
+    (profile) => {
+      for (const spacing of ["", " "]) {
+        const original = "'C:\\Users\\" + profile + "'," + spacing + "'\\config.json'";
+        expect(sanitizeErrorOutput(original)).toBe(original);
+      }
+    },
+  );
+
+  it.each(["O'Connor", "D'Ángelo", "O''Connor", "James'"])(
+    "redacts apostrophes in single-quoted filesystem errors: %s",
+    (profile) => {
+      const path = "C:\\Users\\" + profile + "\\project\\file.txt";
+      let original = "ENOENT: no such file or directory, open '" + path + "'";
+      let expected = "ENOENT: no such file or directory, open '~\\project\\file.txt'";
+      for (let level = 0; level < 3; level++) {
+        expect(sanitizeErrorOutput(original)).toBe(expected);
+        original = JSON.stringify({ message: original });
+        expected = JSON.stringify({ message: expected });
+      }
+      expect(sanitizeErrorOutput("'" + path + "','\\config.json'")).toBe(
+        "'~\\project\\file.txt','\\config.json'",
+      );
+      const bare = "'C:\\Users\\" + profile + "','\\config.json'";
+      expect(sanitizeErrorOutput(bare)).toBe(bare);
+    },
+  );
+
+  it.each([
+    "'C:\\Users\\alice failed, see ..\\logs'",
+    "The path 'C:\\Users\\alice was not found, tried ..\\x' is missing",
+    "'C:\\Users\\alice failed, see \\logs'",
+  ])("preserves quoted prose with an invalid profile ending: %s", (original) => {
+    expect(sanitizeErrorOutput(original)).toBe(original);
+  });
+
+  it("retains punctuation inside an ordinary quoted profile component", () => {
+    expect(sanitizeErrorOutput("'C:\\Users\\Dr. John Smith\\project'")).toBe("'~\\project'");
+  });
+
+  it.each([
+    "-",
+    ".",
+    ",",
+    ";",
+    "&",
+    "(",
+    ")",
+    "[",
+    "]",
+    "{",
+    "}",
+    "+",
+    "=",
+    "@",
+    "!",
+    "$",
+    "%",
+    "^",
+    "~",
+    String.fromCharCode(96),
+    "#",
+    "_",
+  ])("redacts an apostrophe before filename punctuation: %s", (punctuation) => {
+    const profile = "O'" + punctuation + "Connor";
+    let original = "open 'C:\\Users\\" + profile + "\\project\\file.txt'";
+    let expected = "open '~\\project\\file.txt'";
+    for (let level = 0; level < 3; level++) {
+      expect(sanitizeErrorOutput(original)).toBe(expected);
+      original = JSON.stringify({ message: original });
+      expected = JSON.stringify({ message: expected });
+    }
+  });
+
+  it.each([
+    "['C:\\Users\\alice'], ['\\config.json']",
+    "('C:\\Users\\alice');('\\config.json')",
+    "'C:\\Users\\alice'+'\\config.json'",
+    "'C:\\Users\\alice'&&'\\config.json'",
+    "'C:\\Users\\alice';'relative\\file'",
+    "'C:\\Users\\alice' 'relative\\file'",
+  ])("preserves quoted field and expression boundaries: %s", (original) => {
+    expect(sanitizeErrorOutput(original)).toBe(original);
+  });
+
   it("leaves normal error text unchanged", () => {
     expect(sanitizeErrorOutput("Error: command failed")).toBe("Error: command failed");
   });
+
+  it.each([0, 1, 2])(
+    "redacts spaced Windows profile names after %i JSON encoding levels",
+    (levels) => {
+      let original = "C:\\Users\\John Smith\\project\\error.log";
+      let expected = "~\\project\\error.log";
+      for (let level = 0; level < levels; level++) {
+        original = JSON.stringify({ message: original });
+        expected = JSON.stringify({ message: expected });
+      }
+      expect(sanitizeErrorOutput(original)).toBe(expected);
+    },
+  );
 
   it("handles multiple paths in a single message", () => {
     const input = "error in /home/alice/project/a.ts and /Users/bob/project/b.ts";
