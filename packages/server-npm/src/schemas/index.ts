@@ -29,7 +29,9 @@ export const NpmInstallSchema = z.object({
   lockfileChanged: z
     .boolean()
     .optional()
-    .describe("Whether the package manager lockfile changed during install"),
+    .describe(
+      "Whether the package manager lockfile directly in path changed during install; workspace-root lockfiles elsewhere are not observed",
+    ),
   packageDetails: z
     .array(NpmInstallPackageSchema)
     .optional()

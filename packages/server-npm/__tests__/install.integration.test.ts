@@ -57,11 +57,11 @@ describe("install through the MCP server", () => {
     rmSync(fixture, { recursive: true, force: true });
   });
 
-  function writePostinstall(fail: boolean) {
+  function writePostinstall(fail: boolean, output = "added 99 packages") {
     writeFileSync(
       join(project, "postinstall.cjs"),
       "require('node:fs').writeFileSync('postinstall-ran', 'yes');\n" +
-        "console.log('added 99 packages');\n" +
+        `console.log(${JSON.stringify(output)});\n` +
         (fail ? "process.exit(9);\n" : ""),
     );
   }
@@ -131,6 +131,15 @@ describe("install through the MCP server", () => {
     expect(result.isError).toBe(true);
     expect(textContent(result)).toContain('must not start with "-"');
     expect(existsSync(join(project, "pnpm-lock.yaml"))).toBe(false);
+  });
+
+  it("sanitizes lifecycle stdout when reporting a non-silent install failure", async () => {
+    const original = "C:\\Users\\review-user\\project\\error.log";
+    writePostinstall(true, original);
+    const result = await install({ pnpmReporter: undefined, ignoreScripts: false });
+    expect(result.isError).toBe(true);
+    expect(textContent(result)).toContain("~\\project\\error.log");
+    expect(textContent(result)).not.toContain(original);
   });
 
   it.each(["npm", "yarn"])("rejects the reporter for %s through MCP", async (pm) => {

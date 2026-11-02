@@ -147,6 +147,14 @@ describe("install tool", () => {
     await expect(call()).rejects.toThrow(/Lifecycle script failed[\s\S]*permission denied/);
   });
 
+  it.each([
+    ["/home/review-user/project/error.log", "~/project/error.log"],
+    ["C:\\Users\\review-user\\project\\error.log", "~\\project\\error.log"],
+  ])("sanitizes home paths from failed-install stdout: %s", async (original, sanitized) => {
+    vi.mocked(runPm).mockResolvedValueOnce({ exitCode: 1, stdout: original, stderr: "" });
+    await expect(call()).rejects.toThrow(sanitized);
+  });
+
   it("preserves launch and timeout errors", async () => {
     vi.mocked(runPm).mockRejectedValueOnce(new Error("Command pnpm timed out"));
     await expect(call({ pnpmReporter: "silent" })).rejects.toThrow("Command pnpm timed out");

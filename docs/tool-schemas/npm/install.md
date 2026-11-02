@@ -37,6 +37,8 @@ Successful structured output contains independently measured information:
 }
 ```
 
+`lockfileChanged` compares the package manager's lockfile directly in `path`. A workspace-root lockfile outside that directory is not observed; `false` does not rule out changes to that workspace-root lockfile.
+
 `added`, `removed`, `changed`, `packageDetails`, `funding`, and `vulnerabilities` are omitted because silent output cannot establish them. The count fields are optional in the output schema; clients must distinguish missing counts from zero. The readable summary says `package counts unavailable`. Calls without `pnpmReporter` keep their existing summary behavior.
 
 Lifecycle scripts remain disabled by default. `ignoreScripts: false` removes the tool's `--ignore-scripts` flag; pnpm and project policy still govern which scripts may run. Package operands in `args` retain flag-injection protection; reporter flags must use the typed option.
