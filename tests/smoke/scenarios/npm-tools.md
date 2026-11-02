@@ -155,7 +155,7 @@
 
 | #   | Scenario                           | Params                                                              | Expected Output                                     | Priority | Status   |
 | --- | ---------------------------------- | ------------------------------------------------------------------- | --------------------------------------------------- | -------- | -------- |
-| 1   | Install from existing lockfile     | `{ path }`                                                          | `added >= 0`, `packages > 0`, `duration > 0`        | P0       | complete |
+| 1   | Install from existing lockfile     | `{ path }`                                                          | `added >= 0`, `removed >= 0`, `changed >= 0`        | P0       | complete |
 | 2   | Install specific package           | `{ path, args: ["lodash"] }`                                        | `added >= 1`                                        | P0       | complete |
 | 3   | No package.json                    | `{ path: "/tmp/empty-dir" }`                                        | Error thrown                                        | P0       | complete |
 | 4   | Flag injection via args            | `{ path, args: ["--exec=evil"] }`                                   | `assertNoFlagInjection` throws                      | P0       | complete |

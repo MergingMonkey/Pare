@@ -160,6 +160,29 @@ describe("install tool", () => {
     await expect(call({ pnpmReporter: "silent" })).rejects.toThrow("Command pnpm timed out");
   });
 
+  it.each([
+    { name: "single-line", stdout: "x".repeat(20_000) },
+    {
+      name: "multiline",
+      stdout: Array.from({ length: 1_000 }, () => "progress".repeat(12)).join("\n"),
+    },
+  ])("bounds long $name failure diagnostics", async ({ stdout, name }) => {
+    vi.mocked(runPm).mockResolvedValueOnce({
+      exitCode: 1,
+      stdout,
+      stderr: "fatal install error",
+    });
+    const error = await call().then(
+      () => undefined,
+      (error: Error) => error,
+    );
+    expect(error).toBeInstanceOf(Error);
+    expect(error!.message).toMatch(/pnpm install failed \(exit code 1\)/);
+    expect(error!.message.length).toBeLessThan(8_500);
+    expect(error!.message).toMatch(/omitted|truncated/);
+    if (name === "multiline") expect(error!.message).toContain("fatal install error");
+  });
+
   it("sanitizes JSON-encoded Windows paths from npm failure stdout", async () => {
     const original = { error: { summary: "C:\\Users\\review-user\\project\\error.log" } };
     const sanitized = { error: { summary: "~\\project\\error.log" } };

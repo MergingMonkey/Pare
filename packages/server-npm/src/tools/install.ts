@@ -10,6 +10,7 @@ import {
   INPUT_LIMITS,
   projectPathInput,
   sanitizeErrorOutput,
+  truncateStream,
 } from "@paretools/shared";
 import { runPm } from "../lib/npm-runner.js";
 import { detectPackageManager } from "../lib/detect-pm.js";
@@ -164,9 +165,11 @@ export function registerInstallTool(server: McpServer) {
       const start = Date.now();
       const result = await runPm(pm, [subcommand, ...flags, ...(args || [])], cwd);
       if (result.exitCode !== 0) {
-        const diagnostics = sanitizeErrorOutput(
-          [result.stdout.trim(), result.stderr.trim()].filter(Boolean).join("\n"),
-        );
+        const diagnostics = truncateStream(
+          sanitizeErrorOutput(
+            [result.stdout.trim(), result.stderr.trim()].filter(Boolean).join("\n"),
+          ),
+        ).text;
         throw new Error(
           `${pm} ${subcommand} failed (exit code ${result.exitCode})` +
             (diagnostics ? `:\n${diagnostics}` : ""),
