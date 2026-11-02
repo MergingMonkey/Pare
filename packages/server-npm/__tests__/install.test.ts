@@ -160,6 +160,17 @@ describe("install tool", () => {
     await expect(call({ pnpmReporter: "silent" })).rejects.toThrow("Command pnpm timed out");
   });
 
+  it("sanitizes JSON-encoded Windows paths from npm failure stdout", async () => {
+    const original = { error: { summary: "C:\\Users\\review-user\\project\\error.log" } };
+    const sanitized = { error: { summary: "~\\project\\error.log" } };
+    vi.mocked(runPm).mockResolvedValueOnce({
+      exitCode: 1,
+      stdout: JSON.stringify(original),
+      stderr: "",
+    });
+    await expect(call({ packageManager: "npm" })).rejects.toThrow(JSON.stringify(sanitized));
+  });
+
   it("still verifies the directory after a successful silent install", async () => {
     rmSync(join(fixture, "node_modules"), { recursive: true });
     await expect(call({ pnpmReporter: "silent" })).rejects.toThrow(/no node_modules/);

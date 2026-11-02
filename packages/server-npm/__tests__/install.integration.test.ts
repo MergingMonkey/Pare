@@ -148,4 +148,18 @@ describe("install through the MCP server", () => {
     expect(textContent(result)).toMatch(new RegExp(`pnpmReporter.*${pm}`));
     expect(existsSync(join(project, "node_modules"))).toBe(false);
   });
+
+  it("sanitizes JSON-encoded lifecycle output from a real npm failure", async () => {
+    const original = "C:\\Users\\review-user\\project\\error.log";
+    writePostinstall(true, JSON.stringify({ message: original }));
+    const result = await install({
+      packageManager: "npm",
+      pnpmReporter: undefined,
+      ignoreScripts: false,
+      noAudit: true,
+    });
+    expect(result.isError).toBe(true);
+    expect(textContent(result)).toContain(JSON.stringify({ message: "~\\project\\error.log" }));
+    expect(textContent(result)).not.toContain(JSON.stringify(original).slice(1, -1));
+  });
 });
