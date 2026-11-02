@@ -43,7 +43,7 @@ Successful structured output contains independently measured information:
 
 Lifecycle scripts remain disabled by default. `ignoreScripts: false` removes the tool's `--ignore-scripts` flag; pnpm and project policy still govern which scripts may run. Package operands in `args` retain flag-injection protection; reporter flags must use the typed option.
 
-A nonzero install exit code produces an MCP error even if output is empty or `node_modules` already exists. Launch failures and timeouts also remain errors. Failure diagnostics prioritize stderr before stdout and are sanitized and bounded using the shared compact-output limits, with truncation explicitly indicated. The silent reporter may suppress cause details; the exit code is still reported. Omit `pnpmReporter` when detailed package-manager output is needed for diagnosis.
+A nonzero install exit code produces an MCP error even if output is empty or `node_modules` already exists. Launch failures and timeouts also remain errors. Failure diagnostics compact stderr and stdout separately, reserve the budget for stderr first, and are sanitized and bounded using the shared compact-output limits, with truncation explicitly indicated. The silent reporter may suppress cause details; the exit code is still reported. Omit `pnpmReporter` when detailed package-manager output is needed for diagnosis.
 
 ## Success — Clean Install
 

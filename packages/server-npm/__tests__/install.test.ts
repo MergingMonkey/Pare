@@ -187,6 +187,30 @@ describe("install tool", () => {
     expect(error!.message).toContain("fatal install error");
   });
 
+  it.each([45, 80])(
+    "preserves the end of %i stderr warning lines alongside verbose stdout",
+    async (warningLines) => {
+      const stderr = [
+        ...Array.from({ length: warningLines }, () => "dependency warning"),
+        "fatal install error: C:\\Users\\John Smith\\project\\error.log",
+      ].join("\n");
+      vi.mocked(runPm).mockResolvedValueOnce({
+        exitCode: 1,
+        stdout: Array.from({ length: 100 }, () => "progress ".repeat(32)).join("\n"),
+        stderr,
+      });
+      const error = await call().then(
+        () => undefined,
+        (error: Error) => error,
+      );
+      expect(error).toBeInstanceOf(Error);
+      expect(error!.message).toContain("fatal install error: ~\\project\\error.log");
+      expect(error!.message).not.toContain("John Smith");
+      expect(error!.message.length).toBeLessThan(8_500);
+      expect(error!.message).toMatch(/omitted|truncated/);
+    },
+  );
+
   it("sanitizes JSON-encoded Windows paths from npm failure stdout", async () => {
     const original = { error: { summary: "C:\\Users\\review-user\\project\\error.log" } };
     const sanitized = { error: { summary: "~\\project\\error.log" } };

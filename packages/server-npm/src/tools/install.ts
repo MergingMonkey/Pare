@@ -11,6 +11,7 @@ import {
   projectPathInput,
   sanitizeErrorOutput,
   truncateStream,
+  COMPACT_BYTE_CAP,
 } from "@paretools/shared";
 import { runPm } from "../lib/npm-runner.js";
 import { detectPackageManager } from "../lib/detect-pm.js";
@@ -165,11 +166,17 @@ export function registerInstallTool(server: McpServer) {
       const start = Date.now();
       const result = await runPm(pm, [subcommand, ...flags, ...(args || [])], cwd);
       if (result.exitCode !== 0) {
-        const diagnostics = truncateStream(
-          sanitizeErrorOutput(
-            [result.stderr.trim(), result.stdout.trim()].filter(Boolean).join("\n"),
-          ),
-        ).text;
+        // Compact streams separately so stdout cannot displace stderr's tail.
+        let remaining = COMPACT_BYTE_CAP;
+        const diagnostics = [result.stderr, result.stdout]
+          .map((stream) => sanitizeErrorOutput(stream.trim()))
+          .filter(Boolean)
+          .map((stream) => {
+            const compact = truncateStream(stream, { byteCap: remaining }).text;
+            remaining = Math.max(0, remaining - compact.length - 1);
+            return compact;
+          })
+          .join("\n");
         throw new Error(
           `${pm} ${subcommand} failed (exit code ${result.exitCode})` +
             (diagnostics ? `:\n${diagnostics}` : ""),
