@@ -167,7 +167,7 @@ export function registerInstallTool(server: McpServer) {
       if (result.exitCode !== 0) {
         const diagnostics = truncateStream(
           sanitizeErrorOutput(
-            [result.stdout.trim(), result.stderr.trim()].filter(Boolean).join("\n"),
+            [result.stderr.trim(), result.stdout.trim()].filter(Boolean).join("\n"),
           ),
         ).text;
         throw new Error(

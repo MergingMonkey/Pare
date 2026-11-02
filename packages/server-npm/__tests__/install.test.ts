@@ -144,7 +144,7 @@ describe("install tool", () => {
       stdout: "Lifecycle script failed",
       stderr: "permission denied",
     });
-    await expect(call()).rejects.toThrow(/Lifecycle script failed[\s\S]*permission denied/);
+    await expect(call()).rejects.toThrow(/permission denied[\s\S]*Lifecycle script failed/);
   });
 
   it.each([
@@ -163,10 +163,14 @@ describe("install tool", () => {
   it.each([
     { name: "single-line", stdout: "x".repeat(20_000) },
     {
+      name: "wide-multiline",
+      stdout: Array.from({ length: 60 }, () => "x".repeat(256)).join("\n"),
+    },
+    {
       name: "multiline",
       stdout: Array.from({ length: 1_000 }, () => "progress".repeat(12)).join("\n"),
     },
-  ])("bounds long $name failure diagnostics", async ({ stdout, name }) => {
+  ])("bounds long $name failure diagnostics", async ({ stdout }) => {
     vi.mocked(runPm).mockResolvedValueOnce({
       exitCode: 1,
       stdout,
@@ -180,7 +184,7 @@ describe("install tool", () => {
     expect(error!.message).toMatch(/pnpm install failed \(exit code 1\)/);
     expect(error!.message.length).toBeLessThan(8_500);
     expect(error!.message).toMatch(/omitted|truncated/);
-    if (name === "multiline") expect(error!.message).toContain("fatal install error");
+    expect(error!.message).toContain("fatal install error");
   });
 
   it("sanitizes JSON-encoded Windows paths from npm failure stdout", async () => {
