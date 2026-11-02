@@ -42,6 +42,19 @@ describe("sanitizeErrorOutput", () => {
     expect(sanitizeErrorOutput("Error: command failed")).toBe("Error: command failed");
   });
 
+  it.each([0, 1, 2])(
+    "redacts spaced Windows profile names after %i JSON encoding levels",
+    (levels) => {
+      let original = "C:\\Users\\John Smith\\project\\error.log";
+      let expected = "~\\project\\error.log";
+      for (let level = 0; level < levels; level++) {
+        original = JSON.stringify({ message: original });
+        expected = JSON.stringify({ message: expected });
+      }
+      expect(sanitizeErrorOutput(original)).toBe(expected);
+    },
+  );
+
   it("handles multiple paths in a single message", () => {
     const input = "error in /home/alice/project/a.ts and /Users/bob/project/b.ts";
     expect(sanitizeErrorOutput(input)).toBe("error in ~/project/a.ts and ~/project/b.ts");

@@ -150,7 +150,7 @@ describe("install through the MCP server", () => {
   });
 
   it("sanitizes JSON-encoded lifecycle output from a real npm failure", async () => {
-    const original = "C:\\Users\\review-user\\project\\error.log";
+    const original = "C:\\Users\\John Smith\\project\\error.log";
     writePostinstall(true, JSON.stringify({ message: original }));
     const result = await install({
       packageManager: "npm",

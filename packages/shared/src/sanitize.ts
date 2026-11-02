@@ -24,7 +24,7 @@ export function sanitizeErrorOutput(text: string): string {
   result = result.replace(/\/root\//g, "~/");
 
   // Windows: C:\Users\<username>\rest → ~\rest (with escaped or literal backslashes)
-  result = result.replace(/[A-Z]:(\\+)Users\1[^\\:\s]+\1/gi, "~$1");
+  result = result.replace(/[A-Z]:(\\+)Users\1[^\\:\r\n]+\1/gi, "~$1");
 
   // Broad mode: redact remaining absolute paths
   if (process.env.PARE_SANITIZE_ALL_PATHS === "true") {
