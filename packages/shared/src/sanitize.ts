@@ -5,7 +5,7 @@
  *   /home/<user>/...  → ~/...
  *   /Users/<user>/... → ~/...
  *   /root/...         → ~/...
- *   C:\Users\<user>\... → ~\...
+ *   C:\Users\<user>\... → ~\... (also spaced names and encoded backslashes)
  *
  * Broad mode (PARE_SANITIZE_ALL_PATHS=true):
  *   Also redacts other absolute paths outside home directories:
@@ -23,8 +23,13 @@ export function sanitizeErrorOutput(text: string): string {
   // Unix: /root/rest → ~/rest
   result = result.replace(/\/root\//g, "~/");
 
-  // Windows: C:\Users\<username>\rest → ~\rest (with escaped or literal backslashes)
-  result = result.replace(/[A-Z]:(\\+)Users\1[^\\:\r\n]+\1/gi, "~$1");
+  // Preserve literal/encoded separators and spaced profile names, without
+  // consuming JSON string boundaries or unquoted shell command separators.
+  result = result.replace(
+    /[A-Z]:(\\+)Users\1([^\\/:*?"<>|\r\n]+)\1/gi,
+    (match, separator: string, username: string) =>
+      /\s(?:&&|;)\s/.test(username) ? match : `~${separator}`,
+  );
 
   // Broad mode: redact remaining absolute paths
   if (process.env.PARE_SANITIZE_ALL_PATHS === "true") {
