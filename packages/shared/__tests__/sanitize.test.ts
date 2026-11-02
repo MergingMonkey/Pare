@@ -141,6 +141,51 @@ describe("sanitizeErrorOutput", () => {
     expect(sanitizeErrorOutput("'C:\\Users\\Dr. John Smith\\project'")).toBe("'~\\project'");
   });
 
+  it.each([
+    "-",
+    ".",
+    ",",
+    ";",
+    "&",
+    "(",
+    ")",
+    "[",
+    "]",
+    "{",
+    "}",
+    "+",
+    "=",
+    "@",
+    "!",
+    "$",
+    "%",
+    "^",
+    "~",
+    String.fromCharCode(96),
+    "#",
+    "_",
+  ])("redacts an apostrophe before filename punctuation: %s", (punctuation) => {
+    const profile = "O'" + punctuation + "Connor";
+    let original = "open 'C:\\Users\\" + profile + "\\project\\file.txt'";
+    let expected = "open '~\\project\\file.txt'";
+    for (let level = 0; level < 3; level++) {
+      expect(sanitizeErrorOutput(original)).toBe(expected);
+      original = JSON.stringify({ message: original });
+      expected = JSON.stringify({ message: expected });
+    }
+  });
+
+  it.each([
+    "['C:\\Users\\alice'], ['\\config.json']",
+    "('C:\\Users\\alice');('\\config.json')",
+    "'C:\\Users\\alice'+'\\config.json'",
+    "'C:\\Users\\alice'&&'\\config.json'",
+    "'C:\\Users\\alice';'relative\\file'",
+    "'C:\\Users\\alice' 'relative\\file'",
+  ])("preserves quoted field and expression boundaries: %s", (original) => {
+    expect(sanitizeErrorOutput(original)).toBe(original);
+  });
+
   it("leaves normal error text unchanged", () => {
     expect(sanitizeErrorOutput("Error: command failed")).toBe("Error: command failed");
   });

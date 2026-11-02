@@ -23,13 +23,20 @@ export function sanitizeErrorOutput(text: string): string {
   // Unix: /root/rest → ~/rest
   result = result.replace(/\/root\//g, "~/");
 
-  // Quoted paths allow filename punctuation and spaces, but cannot cross
-  // the opening quote's matching boundary. Embedded profile apostrophes are
-  // allowed before name characters or the separator; normal Windows profile
-  // components cannot end in a space or period. Preserve separator escape depth.
+  // Quoted profiles allow filename punctuation, including apostrophes.
+  // Recognize quoted-field boundaries instead of limiting the next name character.
   result = result.replace(
-    /(["'])[A-Z]:(\\+)Users\2(?:(?!\1(?![\p{L}\p{M}\p{N}_'\\]))[^\\/:*?"<>|\r\n])+(?<![ .])\2/giu,
-    "$1~$2",
+    /(["'])[A-Z]:(\\+)Users\2([^\\/:*?"<>|\r\n]+)\2/gi,
+    (match, quote: string, separator: string, profile: string) => {
+      // Normal Windows components cannot end in a space or period.
+      if (/[ .]$/.test(profile)) return match;
+      // A quote followed by whitespace, or punctuation leading to another
+      // quote, closes a field/expression rather than belonging to the profile.
+      if (quote === "'" && /'(?:\s|[,;]\s|[^\p{L}\p{M}\p{N}\\/:*?"<>|'\r\n]+')/u.test(profile)) {
+        return match;
+      }
+      return quote + "~" + separator;
+    },
   );
 
   // Unquoted profiles are either one non-whitespace token or name-like words.
