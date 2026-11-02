@@ -100,10 +100,15 @@ describe("sanitizeErrorOutput", () => {
     expect(sanitizeErrorOutput("C:\\Users\\" + profile + "\\project")).toBe("~\\project");
   });
 
-  it("does not cross single-quoted string boundaries", () => {
-    const original = "'C:\\Users\\John Smith', '\\config.json'";
-    expect(sanitizeErrorOutput(original)).toBe(original);
-  });
+  it.each(["alice", "John Smith"])(
+    "does not cross single-quoted string boundaries: %s",
+    (profile) => {
+      for (const spacing of ["", " "]) {
+        const original = "'C:\\Users\\" + profile + "'," + spacing + "'\\config.json'";
+        expect(sanitizeErrorOutput(original)).toBe(original);
+      }
+    },
+  );
 
   it("leaves normal error text unchanged", () => {
     expect(sanitizeErrorOutput("Error: command failed")).toBe("Error: command failed");
