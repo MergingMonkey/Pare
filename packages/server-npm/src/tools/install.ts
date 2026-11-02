@@ -172,7 +172,15 @@ export function registerInstallTool(server: McpServer) {
           .map((stream) => sanitizeErrorOutput(stream.trim()))
           .filter(Boolean)
           .map((stream) => {
-            const compact = truncateStream(stream, { byteCap: remaining }).text;
+            // Apply the shared line budget before a tail-preserving character cap.
+            const lines = truncateStream(stream, { byteCap: Number.MAX_SAFE_INTEGER }).text;
+            let compact = lines;
+            if (lines.length > remaining) {
+              const head = Math.floor(remaining / 2);
+              const tail = remaining - head;
+              compact =
+                lines.slice(0, head) + "\n... (truncated)\n" + (tail > 0 ? lines.slice(-tail) : "");
+            }
             remaining = Math.max(0, remaining - compact.length - 1);
             return compact;
           })

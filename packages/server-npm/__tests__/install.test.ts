@@ -211,6 +211,30 @@ describe("install tool", () => {
     },
   );
 
+  it.each([
+    { name: "wide lines", warnings: Array.from({ length: 60 }, () => "x".repeat(256)).join("\n") },
+    { name: "single wide line", warnings: "x".repeat(20_000) },
+  ])("preserves both ends of stderr exceeding the character cap: $name", async ({ warnings }) => {
+    vi.mocked(runPm).mockResolvedValueOnce({
+      exitCode: 1,
+      stdout: "progress ".repeat(2_000),
+      stderr:
+        "install setup started\n" +
+        warnings +
+        "\nfatal install error: C:\\Users\\John Smith\\project\\error.log",
+    });
+    const error = await call().then(
+      () => undefined,
+      (error: Error) => error,
+    );
+    expect(error).toBeInstanceOf(Error);
+    expect(error!.message).toContain("install setup started");
+    expect(error!.message).toContain("fatal install error: ~\\project\\error.log");
+    expect(error!.message).not.toContain("John Smith");
+    expect(error!.message).toContain("truncated");
+    expect(error!.message.length).toBeLessThan(8_500);
+  });
+
   it("sanitizes JSON-encoded Windows paths from npm failure stdout", async () => {
     const original = { error: { summary: "C:\\Users\\review-user\\project\\error.log" } };
     const sanitized = { error: { summary: "~\\project\\error.log" } };
