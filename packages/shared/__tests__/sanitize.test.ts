@@ -38,6 +38,30 @@ describe("sanitizeErrorOutput", () => {
     expect(sanitizeErrorOutput(original)).toBe(expected);
   });
 
+  it.each([0, 1, 2])(
+    "does not consume adjacent JSON entries after %i extra encoding levels",
+    (levels) => {
+      let original = JSON.stringify(["C:\\Users\\John Smith", "\\config.json"]);
+      for (let level = 0; level < levels; level++) original = JSON.stringify(original);
+      expect(sanitizeErrorOutput(original)).toBe(original);
+    },
+  );
+
+  it.each(["&&", ";"])("does not consume shell text separated by %s", (separator) => {
+    const original = "cd C:\\Users\\alice " + separator + " cd ..\\foo";
+    expect(sanitizeErrorOutput(original)).toBe(original);
+  });
+
+  it.each(["\n", "\r\n"])("does not match Windows home paths across %j", (newline) => {
+    for (const home of ["C:\\Users\\", "C:\\Users\\alice"]) {
+      const original = home + newline + "other\\file";
+      expect(sanitizeErrorOutput(original)).toBe(original);
+    }
+    expect(
+      sanitizeErrorOutput("C:\\Users\\John Smith\\one" + newline + "C:\\Users\\alice\\two"),
+    ).toBe("~\\one" + newline + "~\\two");
+  });
+
   it("leaves normal error text unchanged", () => {
     expect(sanitizeErrorOutput("Error: command failed")).toBe("Error: command failed");
   });
