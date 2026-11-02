@@ -9,6 +9,8 @@ import {
   assertNoFlagInjection,
   INPUT_LIMITS,
   projectPathInput,
+  sanitizeErrorOutput,
+  truncateStream,
 } from "@paretools/shared";
 import { runPm } from "../lib/npm-runner.js";
 import { detectPackageManager } from "../lib/detect-pm.js";
@@ -24,7 +26,8 @@ export function registerInstallTool(server: McpServer) {
     {
       title: "Install Packages",
       description:
-        "Runs npm/pnpm/yarn install and returns a structured summary of added/removed packages and vulnerabilities. " +
+        "Runs npm/pnpm/yarn install and returns available package counts and vulnerability information. " +
+        "Set pnpmReporter to 'silent' for quiet pnpm output; package statistics are omitted in this mode. " +
         "Auto-detects package manager via lock files (pnpm-lock.yaml → pnpm, yarn.lock → yarn, otherwise npm). " +
         "Lifecycle scripts (preinstall/postinstall) are skipped by default for safety. " +
         "Set ignoreScripts to false if packages need postinstall scripts to work (e.g., esbuild, sharp).",
@@ -98,6 +101,12 @@ export function registerInstallTool(server: McpServer) {
           .describe(
             "Registry URL to install from (maps to --registry, e.g., 'https://npm.pkg.github.com')",
           ),
+        pnpmReporter: z
+          .enum(["silent"])
+          .optional()
+          .describe(
+            "pnpm-only reporter (maps to --reporter=silent). Omits package counts and other output-derived statistics. Rejected for npm/yarn.",
+          ),
         packageManager: packageManagerInput,
         filter: filterInput,
       },
@@ -117,6 +126,7 @@ export function registerInstallTool(server: McpServer) {
       exact,
       global: isGlobal,
       registry,
+      pnpmReporter,
       packageManager,
       filter,
     }) => {
@@ -147,18 +157,32 @@ export function registerInstallTool(server: McpServer) {
         exact,
         global: isGlobal,
         registry,
+        pnpmReporter,
       });
 
       const subcommand = frozenLockfile && pm === "npm" ? "ci" : "install";
       const beforeLockfileHash = await getLockfileHash(cwd, pm);
       const start = Date.now();
       const result = await runPm(pm, [subcommand, ...flags, ...(args || [])], cwd);
+      if (result.exitCode !== 0) {
+        const diagnostics = truncateStream(
+          sanitizeErrorOutput(
+            [result.stderr.trim(), result.stdout.trim()].filter(Boolean).join("\n"),
+          ),
+        ).text;
+        throw new Error(
+          `${pm} ${subcommand} failed (exit code ${result.exitCode})` +
+            (diagnostics ? `:\n${diagnostics}` : ""),
+        );
+      }
       const duration = Math.round(((Date.now() - start) / 1000) * 10) / 10;
       const afterLockfileHash = await getLockfileHash(cwd, pm);
       const lockfileChanged = beforeLockfileHash !== afterLockfileHash;
 
       const output = result.stdout + "\n" + result.stderr;
-      const install = parseInstallOutput(output);
+      // Silent output cannot establish statistics, including any summary-like
+      // text emitted by lifecycle scripts. Do not run the parser in this mode.
+      const install = pnpmReporter === "silent" ? {} : parseInstallOutput(output);
 
       // Sanity check: install (other than dry-run / global) MUST leave a
       // node_modules/ on disk. Without this guard, a CLI that exits 0 with
@@ -221,6 +245,7 @@ interface InstallFlagOptions {
   exact?: boolean;
   global?: boolean;
   registry?: string;
+  pnpmReporter?: "silent";
 }
 
 /** Exported for unit tests. */
@@ -228,6 +253,12 @@ export function composeInstallFlags(
   pm: "npm" | "pnpm" | "yarn",
   opts: InstallFlagOptions,
 ): string[] {
+  if (opts.pnpmReporter && pm !== "pnpm") {
+    throw new Error(
+      `pnpmReporter requires pnpm, but the resolved package manager is ${pm}. ` +
+        'Set packageManager: "pnpm" to select pnpm explicitly, or omit pnpmReporter.',
+    );
+  }
   const flags: string[] = [];
   if (opts.ignoreScripts) flags.push("--ignore-scripts");
   if (pm === "pnpm" && opts.filter) flags.push(`--filter=${opts.filter}`);
@@ -249,6 +280,7 @@ export function composeInstallFlags(
   if (opts.exact) flags.push("--save-exact");
   if (opts.global) flags.push("--global");
   if (opts.registry) flags.push(`--registry=${opts.registry}`);
+  if (opts.pnpmReporter) flags.push(`--reporter=${opts.pnpmReporter}`);
   if (pm === "npm") flags.push("--json");
   return flags;
 }
