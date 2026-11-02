@@ -23,9 +23,9 @@ export const NpmInstallPackageSchema = z.object({
 /** Zod schema for structured npm install output including package counts and vulnerabilities. */
 export const NpmInstallSchema = z.object({
   packageManager: packageManagerField,
-  added: z.number(),
-  removed: z.number(),
-  changed: z.number(),
+  added: z.number().optional().describe("Packages added; absent with pnpmReporter: 'silent'"),
+  removed: z.number().optional().describe("Packages removed; absent with pnpmReporter: 'silent'"),
+  changed: z.number().optional().describe("Packages changed; absent with pnpmReporter: 'silent'"),
   lockfileChanged: z
     .boolean()
     .optional()

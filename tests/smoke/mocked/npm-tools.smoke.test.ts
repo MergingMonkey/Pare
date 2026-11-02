@@ -630,10 +630,9 @@ describe("Smoke: npm.install", () => {
 
   it("S3 [P0] no package.json", async () => {
     mockRunPm("", "ENOENT: no such file or directory", 1);
-    // parseInstallOutput parses stdout+stderr, so it will still return something
-    // The tool itself doesn't throw on error exit codes for install
-    const { parsed } = await callAndValidate({ path: "/tmp/empty-dir" });
-    expect(parsed.added).toBe(0);
+    await expect(callAndValidate({ path: "/tmp/empty-dir" })).rejects.toThrow(
+      /npm install failed \(exit code 1\):[\s\S]*ENOENT/,
+    );
   });
 
   it("S4 [P0] flag injection via args", async () => {
