@@ -28,9 +28,32 @@ describe("sanitizeErrorOutput", () => {
     expect(sanitizeErrorOutput("./src/index.ts")).toBe("./src/index.ts");
   });
 
+  it.each([1, 2])("redacts Windows home paths through %i JSON encoding levels", (levels) => {
+    let original = "C:\\Users\\review-user\\project\\error.log";
+    let expected = "~\\project\\error.log";
+    for (let level = 0; level < levels; level++) {
+      original = JSON.stringify({ message: original });
+      expected = JSON.stringify({ message: expected });
+    }
+    expect(sanitizeErrorOutput(original)).toBe(expected);
+  });
+
   it("leaves normal error text unchanged", () => {
     expect(sanitizeErrorOutput("Error: command failed")).toBe("Error: command failed");
   });
+
+  it.each([0, 1, 2])(
+    "redacts spaced Windows profile names after %i JSON encoding levels",
+    (levels) => {
+      let original = "C:\\Users\\John Smith\\project\\error.log";
+      let expected = "~\\project\\error.log";
+      for (let level = 0; level < levels; level++) {
+        original = JSON.stringify({ message: original });
+        expected = JSON.stringify({ message: expected });
+      }
+      expect(sanitizeErrorOutput(original)).toBe(expected);
+    },
+  );
 
   it("handles multiple paths in a single message", () => {
     const input = "error in /home/alice/project/a.ts and /Users/bob/project/b.ts";
