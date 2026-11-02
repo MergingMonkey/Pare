@@ -162,13 +162,7 @@ npm ERR! 404 'nonexistent-pkg-xyz' is not in this registry.
 
 ```json
 {
-  "isError": true,
-  "content": [
-    {
-      "type": "text",
-      "text": "npm install failed (exit code 1):\nnpm ERR! code E404"
-    }
-  ]
+  "error": "npm install failed (exit code 1):\nnpm ERR! code E404"
 }
 ```
 

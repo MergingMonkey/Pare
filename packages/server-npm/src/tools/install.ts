@@ -166,25 +166,7 @@ export function registerInstallTool(server: McpServer) {
       const start = Date.now();
       const result = await runPm(pm, [subcommand, ...flags, ...(args || [])], cwd);
       if (result.exitCode !== 0) {
-        // Compact streams separately so stdout cannot displace stderr's tail.
-        let remaining = COMPACT_BYTE_CAP;
-        const diagnostics = [result.stderr, result.stdout]
-          .map((stream) => sanitizeErrorOutput(stream.trim()))
-          .filter(Boolean)
-          .map((stream) => {
-            // Apply the shared line budget before a tail-preserving character cap.
-            const lines = truncateStream(stream, { byteCap: Number.MAX_SAFE_INTEGER }).text;
-            let compact = lines;
-            if (lines.length > remaining) {
-              const head = Math.floor(remaining / 2);
-              const tail = remaining - head;
-              compact =
-                lines.slice(0, head) + "\n... (truncated)\n" + (tail > 0 ? lines.slice(-tail) : "");
-            }
-            remaining = Math.max(0, remaining - compact.length - 1);
-            return compact;
-          })
-          .join("\n");
+        const diagnostics = compactInstallDiagnostics([result.stderr, result.stdout]);
         throw new Error(
           `${pm} ${subcommand} failed (exit code ${result.exitCode})` +
             (diagnostics ? `:\n${diagnostics}` : ""),
@@ -220,6 +202,28 @@ export function registerInstallTool(server: McpServer) {
   );
 }
 
+/** Sanitizes and bounds install errors, retaining both ends and stream priority. */
+function compactInstallDiagnostics(streams: string[]): string {
+  let remaining = COMPACT_BYTE_CAP;
+  return streams
+    .map((stream) => sanitizeErrorOutput(stream.trim()))
+    .filter(Boolean)
+    .map((stream) => {
+      // Apply the shared line budget before a tail-preserving character cap.
+      const lines = truncateStream(stream, { byteCap: Number.MAX_SAFE_INTEGER }).text;
+      let compact = lines;
+      if (lines.length > remaining) {
+        const head = Math.floor(remaining / 2);
+        const tail = remaining - head;
+        compact =
+          lines.slice(0, head) + "\n... (truncated)\n" + (tail > 0 ? lines.slice(-tail) : "");
+      }
+      remaining = Math.max(0, remaining - compact.length - 1);
+      return compact;
+    })
+    .join("\n");
+}
+
 /**
  * Throws when an install command reports success but no `node_modules/` was
  * created in `cwd`. This catches the dominant silent-success failure mode
@@ -239,12 +243,12 @@ export function assertInstallActuallyHappened(args: {
   if (existsSync(nodeModulesPath)) return;
 
   const stderrTail = args.stderr.trim().split("\n").slice(-5).join("\n");
-  throw new Error(
+  const message =
     `${args.pm} ${args.subcommand} reported success but no node_modules/ was created at ${nodeModulesPath}. ` +
-      `This usually means the package manager exited 0 without actually installing (e.g. a misleading "already up to date" message, or a workspace filter that matched nothing).\n` +
-      `pm=${args.pm} cwd=${args.cwd} exitCode=${args.exitCode}` +
-      (stderrTail ? `\nstderr (last 5 lines):\n${stderrTail}` : ""),
-  );
+    `This usually means the package manager exited 0 without actually installing (e.g. a misleading "already up to date" message, or a workspace filter that matched nothing).\n` +
+    `pm=${args.pm} cwd=${args.cwd} exitCode=${args.exitCode}` +
+    (stderrTail ? `\nstderr (last 5 lines):\n${stderrTail}` : "");
+  throw new Error(compactInstallDiagnostics([message]));
 }
 
 interface InstallFlagOptions {

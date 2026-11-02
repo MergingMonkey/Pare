@@ -3,7 +3,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { z } from "zod";
-import { registerInstallTool } from "../src/tools/install.js";
+import { registerInstallTool, assertInstallActuallyHappened } from "../src/tools/install.js";
 import { runPm } from "../src/lib/npm-runner.js";
 import { formatInstall } from "../src/lib/formatters.js";
 import { NpmInstallSchema, type NpmInstall } from "../src/schemas/index.js";
@@ -233,6 +233,47 @@ describe("install tool", () => {
     expect(error!.message).not.toContain("John Smith");
     expect(error!.message).toContain("truncated");
     expect(error!.message.length).toBeLessThan(8_500);
+  });
+
+  it("sanitizes project paths in the successful-exit verification error", () => {
+    const cwd = "C:\\Users\\review-user\\project";
+    let caught: Error | undefined;
+    try {
+      assertInstallActuallyHappened({
+        cwd,
+        pm: "pnpm",
+        subcommand: "install",
+        exitCode: 0,
+        stderr: "",
+      });
+    } catch (error) {
+      caught = error as Error;
+    }
+    expect(caught).toBeInstanceOf(Error);
+    expect(caught!.message).toMatch(/cwd=~\\project/);
+    expect(caught!.message).not.toContain("review-user");
+    expect(caught!.message).toMatch(/created at ~\\project[\\/]node_modules/);
+  });
+
+  it("bounds the verification error while retaining its context and fatal stderr tail", () => {
+    let caught: Error | undefined;
+    try {
+      assertInstallActuallyHappened({
+        cwd: "C:\\Users\\review-user\\project",
+        pm: "pnpm",
+        subcommand: "install",
+        exitCode: 0,
+        stderr: "x".repeat(20_000) + "\nfatal verification error",
+      });
+    } catch (error) {
+      caught = error as Error;
+    }
+    expect(caught).toBeInstanceOf(Error);
+    expect(caught!.message).toContain("reported success but no node_modules/");
+    expect(caught!.message).toContain("fatal verification error");
+    expect(caught!.message).not.toContain("review-user");
+    expect(caught!.message).toContain("truncated");
+    expect(caught!.message.length).toBeLessThan(8_500);
   });
 
   it("sanitizes JSON-encoded Windows paths from npm failure stdout", async () => {
