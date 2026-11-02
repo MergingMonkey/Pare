@@ -62,6 +62,49 @@ describe("sanitizeErrorOutput", () => {
     ).toBe("~\\one" + newline + "~\\two");
   });
 
+  it.each([
+    "cd C:\\Users\\alice & cd ..\\foo",
+    "cd C:\\Users\\alice&&cd ..\\foo",
+    "cd C:\\Users\\alice;cd ..\\foo",
+    "Cannot open C:\\Users\\alice, see ..\\logs",
+    "Cannot open C:\\Users\\alice (cache ..\\logs)",
+  ])("preserves diagnostic text after a bare home directory: %s", (original) => {
+    expect(sanitizeErrorOutput(original)).toBe(original);
+  });
+
+  it.each(["John & Jane", "John && Jane", "John; Smith", "John, Smith", "John (Work)"])(
+    "redacts punctuation in quoted Windows profiles: %s",
+    (profile) => {
+      for (const quote of ['"', "'"]) {
+        const original = quote + "C:\\Users\\" + profile + "\\project\\error.log" + quote;
+        expect(sanitizeErrorOutput(original)).toBe(quote + "~\\project\\error.log" + quote);
+      }
+      let original = JSON.stringify({ message: "C:\\Users\\" + profile + "\\project\\error.log" });
+      let expected = JSON.stringify({ message: "~\\project\\error.log" });
+      for (let level = 0; level < 2; level++) {
+        expect(sanitizeErrorOutput(original)).toBe(expected);
+        original = JSON.stringify(original);
+        expected = JSON.stringify(expected);
+      }
+    },
+  );
+
+  it.each([
+    "Jörg Müller",
+    "John  Smith",
+    "Alice.Smith",
+    "user@corp",
+    "Research&Development",
+    "O'Connor",
+  ])("retains ordinary unquoted Windows profile handling: %s", (profile) => {
+    expect(sanitizeErrorOutput("C:\\Users\\" + profile + "\\project")).toBe("~\\project");
+  });
+
+  it("does not cross single-quoted string boundaries", () => {
+    const original = "'C:\\Users\\John Smith', '\\config.json'";
+    expect(sanitizeErrorOutput(original)).toBe(original);
+  });
+
   it("leaves normal error text unchanged", () => {
     expect(sanitizeErrorOutput("Error: command failed")).toBe("Error: command failed");
   });

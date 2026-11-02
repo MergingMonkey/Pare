@@ -23,12 +23,15 @@ export function sanitizeErrorOutput(text: string): string {
   // Unix: /root/rest → ~/rest
   result = result.replace(/\/root\//g, "~/");
 
-  // Preserve literal/encoded separators and spaced profile names, without
-  // consuming JSON string boundaries or unquoted shell command separators.
+  // Quoted paths allow filename punctuation and spaces, but cannot cross
+  // the opening quote's matching boundary. Preserve separator escape depth.
+  result = result.replace(/(["'])[A-Z]:(\\+)Users\2(?:(?!\1)[^\\/:*?"<>|\r\n])+\2/gi, "$1~$2");
+
+  // Unquoted profiles are either one non-whitespace token or name-like words.
+  // Spaced punctuation requires quotes so diagnostic prose is not a username.
   result = result.replace(
-    /[A-Z]:(\\+)Users\1([^\\/:*?"<>|\r\n]+)\1/gi,
-    (match, separator: string, username: string) =>
-      /\s(?:&&|;)\s/.test(username) ? match : `~${separator}`,
+    /[A-Z]:(\\+)Users\1(?:[^\s\\/:*?"<>|]+|[\p{L}\p{M}\p{N}_-]+(?:[ .]+[\p{L}\p{M}\p{N}_-]+)+)\1/giu,
+    "~$1",
   );
 
   // Broad mode: redact remaining absolute paths
