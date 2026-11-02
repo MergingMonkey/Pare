@@ -30,7 +30,7 @@ export function sanitizeErrorOutput(text: string): string {
   // Unquoted profiles are either one non-whitespace token or name-like words.
   // Spaced punctuation requires quotes so diagnostic prose is not a username.
   result = result.replace(
-    /[A-Z]:(\\+)Users\1(?:[^\s\\/:*?"<>|]+|[\p{L}\p{M}\p{N}_-]+(?:[ .]+[\p{L}\p{M}\p{N}_-]+)+)\1/giu,
+    /(?<!["'])[A-Z]:(\\+)Users\1(?:[^\s\\/:*?"<>|]+|[\p{L}\p{M}\p{N}_-]+(?:[ .]+[\p{L}\p{M}\p{N}_-]+)+)\1/giu,
     "~$1",
   );
 
