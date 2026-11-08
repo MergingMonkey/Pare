@@ -11,6 +11,7 @@ Stages files for commit. Returns structured data with count and list of staged f
 | `path`     | string   | cwd     | Repository path                                                                                      |
 | `files`    | string[] | --      | File paths to stage (required unless `all`)                                                          |
 | `all`      | boolean  | `false` | Stage all changes (`git add -A`)                                                                     |
+| `update`   | boolean  | `false` | Stage only changes to tracked files (`git add -u`)                                                   |
 | `resolved` | boolean  | `false` | Stage matching unmerged paths only when no conflict markers remain (`git add --resolved`, Git 2.56+) |
 
 ## Success
