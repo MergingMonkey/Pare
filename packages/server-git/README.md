@@ -67,6 +67,23 @@ status   { "path": "/path/to/my/worktree" }
 checkout { "path": "/path/to/my/worktree", "branch": "feature", "create": true }
 ```
 
+## Conflict-resolution staging
+
+On Git 2.56 or newer, pass `resolved: true` to `add` to use native `git add --resolved`:
+
+```json
+{
+  "path": "/workspace/project",
+  "files": ["src/example.ts"],
+  "resolved": true
+}
+```
+
+Git stages only matching unmerged paths and refuses the request when conflict markers remain.
+The option cannot be combined with `all` or `update`.
+Omitting `resolved` or setting it to `false` keeps ordinary staging behavior.
+Older Git versions return their unsupported-option error; the tool never falls back to ordinary `add`.
+
 ## Example
 
 **`status` output:**
