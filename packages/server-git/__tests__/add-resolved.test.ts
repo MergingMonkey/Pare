@@ -47,6 +47,13 @@ describe("add resolved mode (#1250)", () => {
     );
   });
 
+  it("passes dry-run before the pathspec separator in ordinary add", async () => {
+    gitMock.mockResolvedValueOnce({ exitCode: 0, stdout: "", stderr: "" });
+    gitMock.mockResolvedValueOnce({ exitCode: 0, stdout: "", stderr: "" });
+    await handler({ path: "/repo", files: ["one.txt"], dryRun: true });
+    expect(gitMock).toHaveBeenNthCalledWith(1, ["add", "--dry-run", "--", "one.txt"], "/repo");
+  });
+
   it.each([undefined, false])("preserves ordinary add when resolved is %s", async (resolved) => {
     gitMock.mockResolvedValueOnce({ exitCode: 0, stdout: "", stderr: "" });
     gitMock.mockResolvedValueOnce({ exitCode: 0, stdout: "", stderr: "" });

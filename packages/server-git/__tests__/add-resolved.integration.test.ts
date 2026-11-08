@@ -9,6 +9,11 @@ import { GitAddSchema } from "../src/schemas/index.js";
 const addHelp = spawnSync("git", ["add", "-h"], { encoding: "utf8" });
 if (addHelp.error) throw addHelp.error;
 const supportsResolved = /--(?:\[no-\])?resolved\b/.test(`${addHelp.stdout}${addHelp.stderr}`);
+if (!supportsResolved) {
+  console.warn(
+    "Skipping native add --resolved integration tests: installed Git lacks --resolved (Git 2.56+ required).",
+  );
+}
 
 type Handler = (params: Record<string, unknown>) => Promise<{
   structuredContent: unknown;
